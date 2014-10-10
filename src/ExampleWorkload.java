@@ -51,14 +51,10 @@ public class ExampleWorkload {
             // parameters: maxField, jobNum, submitTime, runTime, numPE
             workload.setField(4, 1, 2, 3, 4);
             workload.setComment("#");     // set "#" as a comment
-
             
-            System.out.println(workload.getGridletList().size());
             //////////////////////////////////////////////////////
             /////// Starts the simulation
             GridSim.startGridSimulation();
-
-            System.out.println(workload.getGridletList().size());
             
             //////////////////////////////////////////////////////
             /////// Print queue times
@@ -68,6 +64,7 @@ public class ExampleWorkload {
             }
             printGridletList(glList);
             //workload.printGridletList(true);
+            System.out.println(workload.getGridletList().size());
         } catch (Exception e) {
             e.printStackTrace();
         }

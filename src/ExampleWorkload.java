@@ -57,17 +57,21 @@ public class ExampleWorkload {
             workload.setField(4, 1, 2, 3, 4);
             workload.setComment("#");     // set "#" as a comment
 
+            
+            System.out.println(workload.getGridletList().size());
             //////////////////////////////////////////////////////
             /////// Starts the simulation
             GridSim.startGridSimulation();
 
+            System.out.println(workload.getGridletList().size());
+            
             //////////////////////////////////////////////////////
             /////// Print queue times
             GridletList glList = new GridletList();
             for (Gridlet gl : workload.getGridletList()) {
                 glList.add(gl);
             }
-            printGridletList(glList);
+            //printGridletList(glList);
             //workload.printGridletList(true);
         } catch (Exception e) {
             e.printStackTrace();

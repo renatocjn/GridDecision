@@ -25,21 +25,16 @@ public class ExampleWorkload {
             Calendar calendar = Calendar.getInstance();
             boolean trace_flag = true;     // mean trace GridSim events
 
-            String[] exclude_from_file = {""};
-            String[] exclude_from_processing = {""};
-            String report_name = "stats_report.txt";
-
             // Initialize the GridSim package
             System.out.println("Initializing GridSim package");
-            GridSim.init(num_user, calendar, trace_flag, exclude_from_file,
-                    exclude_from_processing, report_name);
+            GridSim.init(num_user, calendar, trace_flag);
 
             //////////////////////////////////////////////////////
             /////// Creating resources
             int totalResource = 2;  // total number of Grid resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
-            int totalMachine = 50;   // total number of Machines
+            int totalMachine = 10;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
@@ -72,7 +67,7 @@ public class ExampleWorkload {
                 glList.add(gl);
             }
             printGridletList(glList);
-            workload.printGridletList(true);
+            //workload.printGridletList(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -161,11 +156,10 @@ public class ExampleWorkload {
                     peakLoad, offPeakLoad, holidayLoad, Weekends,
                     Holidays, seed);
 
-            new GridResource(name, baud_rate, resConfig, resCalendar, allocPolicy);
+            gridRes = new GridResource(name, baud_rate, resConfig, resCalendar, allocPolicy);
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         System.out.println("Creates one Grid resource with name = " + name);
     }
 

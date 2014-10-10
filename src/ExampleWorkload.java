@@ -31,14 +31,13 @@ public class ExampleWorkload {
 
             //////////////////////////////////////////////////////
             /////// Creating resources
-            int totalResource = 2;  // total number of Grid resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
             int totalMachine = 10;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
-            CenapadSpaceShared allocPolicy = new CenapadSpaceShared(resName, "allocPolicy");
+            CenapadAllocPolicy allocPolicy = new CenapadAllocPolicy(resName, "allocPolicy");
             createGridResource(resName, rating, totalMachine, totalPE, allocPolicy);
 
             //////////////////////////////////////////////////////

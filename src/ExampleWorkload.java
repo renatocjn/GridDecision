@@ -12,24 +12,21 @@
  * where $GRIDSIM or %GRIDSIM% is the location of the gridsimtoolkit package.
  *
  */
-
 import java.util.*;
 import gridsim.*;
 import gridsim.util.*;
 
-public class ExampleWorkload
-{
-    public static void main(String[] args)
-    {
-        try
-        {
+public class ExampleWorkload {
+
+    public static void main(String[] args) {
+        try {
             // number of grid user entities + any Workload entities.
             int num_user = 1;
             Calendar calendar = Calendar.getInstance();
             boolean trace_flag = true;     // mean trace GridSim events
 
-            String[] exclude_from_file = { "" };
-            String[] exclude_from_processing = { "" };
+            String[] exclude_from_file = {""};
+            String[] exclude_from_processing = {""};
             String report_name = "stats_report.txt";
 
             // Initialize the GridSim package
@@ -37,10 +34,8 @@ public class ExampleWorkload
             GridSim.init(num_user, calendar, trace_flag, exclude_from_file,
                     exclude_from_processing, report_name);
 
-
-			//////////////////////////////////////////////////////
-			/////// Creating resources
-			
+            //////////////////////////////////////////////////////
+            /////// Creating resources
             int totalResource = 2;  // total number of Grid resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
@@ -51,75 +46,70 @@ public class ExampleWorkload
             CenapadSpaceShared allocPolicy = new CenapadSpaceShared(resName, "allocPolicy");
             createGridResource(resName, rating, totalMachine, totalPE, allocPolicy);
 
-			//////////////////////////////////////////////////////
-			/////// Creating Workload
-			
+            //////////////////////////////////////////////////////
+            /////// Creating Workload
             String tracefile = "workload_all.jobs"; // custom trace file format
-            Workload workload = 
-           		new Workload("Load_0", tracefile, resName, rating);
+            Workload workload
+                    = new Workload("Load_0", tracefile, resName, rating);
 
             // tells the Workload entity what to look for.
             // parameters: maxField, jobNum, submitTime, runTime, numPE
             workload.setField(4, 1, 2, 3, 4);
             workload.setComment("#");     // set "#" as a comment
 
-            
             //////////////////////////////////////////////////////
-			/////// Starts the simulation
-			
-			GridSim.startGridSimulation();
-			
-			//////////////////////////////////////////////////////
-			/////// Print queue times
-                        GridletList glList = new GridletList();
-                        for (Gridlet gl : workload.getGridletList()) {
-                            glList.add(gl);
-                        }
-			printGridletList(glList);
-			//workload.printGridletList(true);
-        }
-        catch (Exception e) {
+            /////// Starts the simulation
+            GridSim.startGridSimulation();
+
+            //////////////////////////////////////////////////////
+            /////// Print queue times
+            GridletList glList = new GridletList();
+            for (Gridlet gl : workload.getGridletList()) {
+                glList.add(gl);
+            }
+            printGridletList(glList);
+            //workload.printGridletList(true);
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-	private static void printGridletList(GridletList list)
-    {
+    private static void printGridletList(GridletList list) {
         int size = list.size();
         Gridlet gridlet;
 
-        String indent = "    ";
+        String indent = "\t";
         System.out.println();
         System.out.println("========== OUTPUT ==========");
-        System.out.println("Gridlet ID" + indent + "STATUS" + indent +
-                "Resource ID" + indent + "queue time");
+        System.out.println("Gridlet ID" + indent + "Status" + indent
+                + "QueueTime" + indent + "RunTime");
 
-        for (int i = 0; i < size; i++)
-        {
+        for (int i = 0; i < size; i++) {
             gridlet = (Gridlet) list.get(i);
-            System.out.print(indent + gridlet.getGridletID() + indent
-                    + indent);
+            System.out.print(indent + gridlet.getGridletID() + indent);
 
-            if (gridlet.getGridletStatus() == Gridlet.SUCCESS)
+            if (gridlet.getGridletStatus() == Gridlet.SUCCESS) {
                 System.out.print("SUCCESS");
+            }
 
-            System.out.println( indent + indent + gridlet.getResourceID() +
-                    indent + indent + gridlet.getWaitingTime() );
+            System.out.println(indent + (gridlet.getExecStartTime() - 
+                    gridlet.getSubmissionTime()) + indent + 
+                    (gridlet.getFinishTime() - gridlet.getExecStartTime()));
         }
     }
 
     /**
-     * Creates one Grid resource. A Grid resource contains one or more
-     * Machines. Similarly, a Machine contains one or more PEs (Processing
-     * Elements or CPUs).
-     * @param name      a Grid Resource name
-     * @param peRating  rating of each PE
-     * @param totalMachine  total number of Machines
-     * @param totalPE       total number of PEs for each Machine
+     * Creates one Grid resource. A Grid resource contains one or more Machines.
+     * Similarly, a Machine contains one or more PEs (Processing Elements or
+     * CPUs).
+     *
+     * @param name a Grid Resource name
+     * @param peRating rating of each PE
+     * @param totalMachine total number of Machines
+     * @param totalPE total number of PEs for each Machine
      */
     private static void createGridResource(String name, int peRating,
-                                           int totalMachine, int totalPE, AllocPolicy allocPolicy)
-    {
+            int totalMachine, int totalPE, AllocPolicy allocPolicy) {
         //////////////////////////////////////////
         // Here are the steps needed to create a Grid resource:
         // 1. We need to create an object of MachineList to store one or more
@@ -127,10 +117,9 @@ public class ExampleWorkload
         MachineList mList = new MachineList();
 
         int rating = peRating;
-        for (int i = 0; i < totalMachine; i++)
-        {
+        for (int i = 0; i < totalMachine; i++) {
             // 2. Create one Machine with its id, number of PEs and rating
-            mList.add( new Machine(i, totalPE, rating));
+            mList.add(new Machine(i, totalPE, rating));
         }
 
         //////////////////////////////////////////
@@ -150,7 +139,7 @@ public class ExampleWorkload
         //////////////////////////////////////////
         // 4. Finally, we need to create a GridResource object.
         double baud_rate = 10000.0;           // communication speed
-        long seed = 11L*13*17*19*23+1;
+        long seed = 11L * 13 * 17 * 19 * 23 + 1;
         double peakLoad = 0.0;       // the resource load during peak hour
         double offPeakLoad = 0.0;    // the resource load during off-peak hr
         double holidayLoad = 0.0;    // the resource load during holiday
@@ -165,12 +154,11 @@ public class ExampleWorkload
         GridResource gridRes = null;
         try {
             ResourceCalendar resCalendar = new ResourceCalendar(time_zone,
-                peakLoad, offPeakLoad, holidayLoad, Weekends,
-                Holidays, seed);
+                    peakLoad, offPeakLoad, holidayLoad, Weekends,
+                    Holidays, seed);
 
             new GridResource(name, baud_rate, resConfig, resCalendar, allocPolicy);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 

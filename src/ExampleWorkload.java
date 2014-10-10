@@ -71,8 +71,8 @@ public class ExampleWorkload {
             for (Gridlet gl : workload.getGridletList()) {
                 glList.add(gl);
             }
-            //printGridletList(glList);
-            //workload.printGridletList(true);
+            printGridletList(glList);
+            workload.printGridletList(true);
         } catch (Exception e) {
             e.printStackTrace();
         }

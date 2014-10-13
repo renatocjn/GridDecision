@@ -316,10 +316,11 @@ class CenapadAllocPolicy extends AllocPolicy
                 status = true;
                 rgl.setGridletStatus(Gridlet.PAUSED);  // change the status
                 gridletPausedList_.add(rgl);   // add into the paused list
-
                 // Set the PE on which Gridlet finished to FREE
-                super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
-                                             rgl.getPEID() );
+                for (int peId : rgl.getListPEID()) {
+                    super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
+                                             peId );
+                }
 
                 // empty slot is available, hence process a new Gridlet
                 allocateQueueGridlet();
@@ -418,9 +419,10 @@ class CenapadAllocPolicy extends AllocPolicy
             rgl.finalizeGridlet();
 
             // Set PE on which Gridlet finished to FREE
-            super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
-                                         rgl.getPEID() );
-
+            for (int PEid : rgl.getListPEID()) {
+                super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
+                                         PEid );
+            }
             super.gridletMigrate(rgl.getGridlet(), destId, ack);
             allocateQueueGridlet();
         }
@@ -500,11 +502,9 @@ class CenapadAllocPolicy extends AllocPolicy
         // PE to the first Gridlet in the list since it follows FCFS
         // (First Come First Serve) approach. Then removes the Gridlet from
         // the Queue list
-        if (gridletQueueList_.size() > 0 &&
-            gridletInExecList_.size() < super.totalPE_)
-        {
+        
+        if (!gridletQueueList_.isEmpty()) {
             ResGridlet obj = (ResGridlet) gridletQueueList_.get(0);
-
             // allocate the Gridlet into an empty PE slot and remove it from
             // the queue list
             boolean success = allocatePEtoGridlet(obj);
@@ -594,7 +594,7 @@ class CenapadAllocPolicy extends AllocPolicy
      */
     private boolean allocatePEtoGridlet(ResGridlet rgl)
     {
-        // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
+        // IDENTIFY MACHINE which is free and has a enough number of PE
         Machine myMachine = null;
         for (Machine m : resource_.getMachineList()) {
             if (rgl.getNumPE() < m.getNumPE() && m.getNumBusyPE() == 0)
@@ -609,7 +609,7 @@ class CenapadAllocPolicy extends AllocPolicy
         rgl.setGridletStatus(Gridlet.INEXEC);   // change Gridlet status
         gridletInExecList_.add(rgl); //add gridlet to execution list
 	for(int i=0; i<rgl.getNumPE(); i++) {
-		// gets the list of PEs and find one empty PE
+		// gets the list of PEs and find one free PE
 	        int freePE = MyPEList.getFreePEID();
 	        rgl.setMachineAndPEID(myMachine.getMachineID(), freePE);
         	super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE); //set PE to BUSY status
@@ -747,8 +747,10 @@ class CenapadAllocPolicy extends AllocPolicy
             }
 
             // Set PE on which Gridlet finished to FREE
-            super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
-                                        rgl.getPEID() );
+            for (int PEid : rgl.getListPEID()) {
+                super.resource_.setStatusPE( PE.FREE, rgl.getMachineID(),
+                                        PEid );
+            }
             allocateQueueGridlet();
             return rgl;
         }

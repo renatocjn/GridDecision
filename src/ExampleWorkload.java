@@ -33,7 +33,7 @@ public class ExampleWorkload {
             /////// Creating resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
-            int totalMachine = 50;   // total number of Machines
+            int totalMachine = 5;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";

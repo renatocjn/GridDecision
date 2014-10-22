@@ -32,8 +32,8 @@ public class ExampleWorkload {
             //////////////////////////////////////////////////////
             /////// Creating resources
             int rating = 100;       // rating of each PE in MIPS
-            int totalPE = 80;        // total number of PEs for each Machine
-            int totalMachine = 1;   // total number of Machines
+            int totalPE = 12;        // total number of PEs for each Machine
+            int totalMachine = 48;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
@@ -73,23 +73,24 @@ public class ExampleWorkload {
         int size = list.size();
         Gridlet gridlet;
 
-        String indent = "\t";
+        String div = ",";
         //System.out.println();
         //System.out.println("========== OUTPUT ==========");
-        System.out.println("Gridlet ID" + indent + "Status" + indent
-                + "QueueTime" + indent + "RunTime");
+        System.out.println("Gridlet ID" + div + "SubmissionTime" + div
+                + "QueueTime" + div + "RunTime");
 
         for (int i = 0; i < size; i++) {
             gridlet = (Gridlet) list.get(i);
-            System.out.print(indent + gridlet.getGridletID() + indent);
-
-            if (gridlet.getGridletStatus() == Gridlet.SUCCESS) {
-                System.out.print("SUCCESS");
-            }
-
-            System.out.println(indent + (gridlet.getExecStartTime()
-                    - gridlet.getSubmissionTime()) + indent
-                    + (gridlet.getFinishTime() - gridlet.getExecStartTime()));
+            System.out.print(gridlet.getGridletID());
+            System.out.print(div + gridlet.getSubmissionTime());
+            
+            double queueTime = gridlet.getExecStartTime() - 
+                    gridlet.getSubmissionTime();
+            System.out.print(div + queueTime);
+            
+            double runTime = gridlet.getFinishTime() - 
+                    gridlet.getExecStartTime();
+            System.out.println(div + runTime);
         }
     }
 

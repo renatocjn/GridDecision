@@ -5,10 +5,10 @@
  * License:      GPL - http://www.gnu.org/copyleft/gpl.html
  *
  */
-import gridsim.*;
 import java.util.Iterator;
 import eduni.simjava.Sim_event;
 import eduni.simjava.Sim_system;
+import gridsim.*;
 
 /**
  * SpaceShared class is an allocation policy for GridResource that behaves
@@ -80,23 +80,20 @@ class CenapadAllocPolicy extends AllocPolicy {
         for (int i = 0; i < size; i++) {
             machineRating_[i] = super.resource_.getMIPSRatingOfOnePE(i, 0);
         }
+
         // a loop that is looking for internal events only
         Sim_event ev = new Sim_event();
         while (Sim_system.running()) {
             super.sim_get_next(ev);
-            
+
             // if the simulation finishes then exit the loop
             if (ev.get_tag() == GridSimTags.END_OF_SIMULATION
                     || super.isEndSimulation()) {
-                System.out.println("CenapadAllocPolicy: EndOFSimulation");
                 break;
             }
 
             // Internal Event if the event source is this entity
-            if (gridletInExecList_.size() > 0 || gridletQueueList_.size() > 0) {
-                //System.out.println("CenapadAllocPolicy: Lists status:");
-                //System.out.println("\t Exec: "+gridletInExecList_.size());
-                //System.out.println("\t Queue: "+gridletQueueList_.size());
+            if (ev.get_src() == super.myId_ && gridletInExecList_.size() > 0) {
                 updateGridletProcessing();   // update Gridlets
                 checkGridletCompletion();    // check for finished Gridlets
             }
@@ -104,6 +101,7 @@ class CenapadAllocPolicy extends AllocPolicy {
 
         // CHECK for ANY INTERNAL EVENTS WAITING TO BE PROCESSED
         while (super.sim_waiting() > 0) {
+            System.out.println("waiting event");
             // wait for event and ignore since it is likely to be related to
             // internal event scheduled to update Gridlets processing
             super.sim_get_next(ev);
@@ -127,18 +125,16 @@ class CenapadAllocPolicy extends AllocPolicy {
         // update the current Gridlets in exec list up to this point in time
         updateGridletProcessing();
 
+
         ResGridlet rgl = new ResGridlet(gl);
-        // if there is an available PE slot, then allocate immediately
         boolean success = allocatePEtoGridlet(rgl);
         
         // if no available PE then put the ResGridlet into a Queue list
         if (!success) {
             rgl.setGridletStatus(Gridlet.QUEUED);
             gridletQueueList_.add(rgl);
-            //System.out.println("Submit: Gridlet enqueued");
-        } /*else {
-            System.out.println("Submit: Gridlet running");
-        }*/
+        }
+
         // sends back an ack if required
         if (ack) {
             super.sendAck(GridSimTags.GRIDLET_SUBMIT_ACK, true,
@@ -283,15 +279,10 @@ class CenapadAllocPolicy extends AllocPolicy {
                 status = true;
                 rgl.setGridletStatus(Gridlet.PAUSED);  // change the status
                 gridletPausedList_.add(rgl);   // add into the paused list
+
                 // Set the PE on which Gridlet finished to FREE
-                int[] peList = rgl.getListPEID();
-                if (peList == null) {
-                    super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
-                } else {
-                    for (int i=0; i<rgl.getNumPE(); i++) {
-                        super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peList[i]);
-                    }
-                }
+                super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(),
+                        rgl.getPEID());
 
                 // empty slot is available, hence process a new Gridlet
                 allocateQueueGridlet();
@@ -380,14 +371,9 @@ class CenapadAllocPolicy extends AllocPolicy {
             rgl.finalizeGridlet();
 
             // Set PE on which Gridlet finished to FREE
-            int[] peList = rgl.getListPEID();
-            if (peList == null) {
-                super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
-            } else {
-                for (int i=0; i<rgl.getNumPE(); i++) {
-                    super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peList[i]);
-                }
-            }
+            super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(),
+                    rgl.getPEID());
+
             super.gridletMigrate(rgl.getGridlet(), destId, ack);
             allocateQueueGridlet();
         }
@@ -429,10 +415,7 @@ class CenapadAllocPolicy extends AllocPolicy {
             // otherwise put into Queue list
             if (!success) {
                 rgl.setGridletStatus(Gridlet.QUEUED);
-                //System.out.println("Resume: Gridlet enqueued");
                 gridletQueueList_.add(rgl);
-            } else {
-                //System.out.println("Resume: Gridlet running");
             }
 
             System.out.println(super.resName_ + "TimeShared.gridletResume():"
@@ -463,19 +446,13 @@ class CenapadAllocPolicy extends AllocPolicy {
         // PE to the first Gridlet in the list since it follows FCFS
         // (First Come First Serve) approach. Then removes the Gridlet from
         // the Queue list
-
         while (!gridletQueueList_.isEmpty()) {
             ResGridlet obj = (ResGridlet) gridletQueueList_.get(0);
+
             // allocate the Gridlet into an empty PE slot and remove it from
             // the queue list
-            boolean success = allocatePEtoGridlet(obj);
-            if (success) {
+            if ( allocatePEtoGridlet(obj) );
                 gridletQueueList_.remove(obj);
-                //System.out.println("started job from job queue");
-            } else {
-                //System.out.println("Failed to run head of job queue");
-                break;
-            }
         }
     }
 
@@ -557,11 +534,11 @@ class CenapadAllocPolicy extends AllocPolicy {
      * @post $none
      */
     private boolean allocatePEtoGridlet(ResGridlet rgl) {
-        // IDENTIFY MACHINE which is free and has a enough number of PE
+        // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
         Machine myMachine = null;
+
         for (Machine m : resource_.getMachineList()) {
-            //System.out.println(m.getNumBusyPE());
-            if (rgl.getNumPE() <= m.getNumPE() && m.getNumBusyPE() == 0) {
+            if (m.getNumBusyPE() == 0 && m.getNumPE() >= rgl.getNumPE()) {
                 myMachine = m;
                 break;
             }
@@ -571,25 +548,34 @@ class CenapadAllocPolicy extends AllocPolicy {
         if (myMachine == null) {
             return false;
         }
-        
+
+        // gets the list of PEs and find one empty PE
         PEList MyPEList = myMachine.getPEList();
-        rgl.setGridletStatus(Gridlet.INEXEC);   // change Gridlet status
-        gridletInExecList_.add(rgl); //add gridlet to execution list
-        for (int i = 0; i < rgl.getNumPE(); i++) {
-            // gets the list of PEs and find one free PE
+        for (int i=0; i<rgl.getNumPE(); i++) {
             int freePE = MyPEList.getFreePEID();
+            
+            // Register PE and machine to gridlet
             rgl.setMachineAndPEID(myMachine.getMachineID(), freePE);
-            super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE); //set PE to BUSY status
+            
+            // Set allocated PE to BUSY status
+            super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE);
         }
+        
+        // change Gridlet status
+        rgl.setGridletStatus(Gridlet.INEXEC);  
+ 
+        // add this Gridlet into execution list
+        gridletInExecList_.add(rgl);
+
 
         // Identify Completion Time and Set Interrupt
         int rating = machineRating_[rgl.getMachineID()];
         double time = forecastFinishTime(rating,
                 rgl.getRemainingGridletLength());
-        
+
         int roundUpTime = (int) (time + 1);   // rounding up
         rgl.setFinishTime(roundUpTime);
-        
+
         // then send this into itself
         super.sendInternalEvent(roundUpTime);
         return true;
@@ -667,17 +653,14 @@ class CenapadAllocPolicy extends AllocPolicy {
      */
     private void gridletFinish(ResGridlet rgl, int status) {
         // Set PE on which Gridlet finished to FREE
-        //System.out.println("gridletFinish");
         int[] peList = rgl.getListPEID();
-        
         if (peList == null) {
             super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
         } else {
-            for (int i=0; i<rgl.getNumPE(); i++) {
-                super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peList[i]);
-            }
+            for(int peID : peList) 
+                resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peID);
         }
-        
+
         // the order is important! Set the status first then finalize
         // due to timing issues in ResGridlet class
         rgl.setGridletStatus(status);
@@ -719,14 +702,8 @@ class CenapadAllocPolicy extends AllocPolicy {
             }
 
             // Set PE on which Gridlet finished to FREE
-            int[] peList = rgl.getListPEID();
-            if (peList == null) {
-                super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
-            } else {
-                for (int i=0; i<rgl.getNumPE(); i++) {
-                    super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peList[i]);
-                }
-            }
+            super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(),
+                    rgl.getPEID());
             allocateQueueGridlet();
             return rgl;
         }

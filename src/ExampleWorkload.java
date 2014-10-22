@@ -32,12 +32,13 @@ public class ExampleWorkload {
             //////////////////////////////////////////////////////
             /////// Creating resources
             int rating = 100;       // rating of each PE in MIPS
-            int totalPE = 12;        // total number of PEs for each Machine
-            int totalMachine = 5;   // total number of Machines
+            int totalPE = 80;        // total number of PEs for each Machine
+            int totalMachine = 1;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
             CenapadAllocPolicy allocPolicy = new CenapadAllocPolicy(resName, "allocPolicy");
+            //TestSpaceShared allocPolicy = new TestSpaceShared(resName, "allocPolicy");
             createGridResource(resName, rating, totalMachine, totalPE, allocPolicy);
 
             //////////////////////////////////////////////////////
@@ -50,11 +51,11 @@ public class ExampleWorkload {
             // parameters: maxField, jobNum, submitTime, runTime, numPE
             workload.setField(4, 1, 2, 3, 4);
             workload.setComment("#");     // set "#" as a comment
-            
+
             //////////////////////////////////////////////////////
             /////// Starts the simulation
             GridSim.startGridSimulation();
-            
+
             //////////////////////////////////////////////////////
             /////// Print queue times
             GridletList glList = new GridletList();
@@ -63,7 +64,6 @@ public class ExampleWorkload {
             }
             printGridletList(glList);
             //workload.printGridletList(true);
-            System.out.println(workload.getGridletList().size());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -74,8 +74,8 @@ public class ExampleWorkload {
         Gridlet gridlet;
 
         String indent = "\t";
-        System.out.println();
-        System.out.println("========== OUTPUT ==========");
+        //System.out.println();
+        //System.out.println("========== OUTPUT ==========");
         System.out.println("Gridlet ID" + indent + "Status" + indent
                 + "QueueTime" + indent + "RunTime");
 
@@ -87,9 +87,9 @@ public class ExampleWorkload {
                 System.out.print("SUCCESS");
             }
 
-            System.out.println(indent + (gridlet.getExecStartTime() - 
-                    gridlet.getSubmissionTime()) + indent + 
-                    (gridlet.getFinishTime() - gridlet.getExecStartTime()));
+            System.out.println(indent + (gridlet.getExecStartTime()
+                    - gridlet.getSubmissionTime()) + indent
+                    + (gridlet.getFinishTime() - gridlet.getExecStartTime()));
         }
     }
 

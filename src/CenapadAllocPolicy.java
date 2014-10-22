@@ -32,7 +32,7 @@ class CenapadAllocPolicy extends AllocPolicy {
     private ResGridletList gridletPausedList_;    // Pause list
     private double lastUpdateTime_;    // the last time Gridlets updated
     private int[] machineRating_;      // list of machine ratings available
-
+    private int peSize;
     /**
      * Allocates a new SpaceShared object
      *
@@ -74,6 +74,8 @@ class CenapadAllocPolicy extends AllocPolicy {
     public void body() {
         // Gets the PE's rating for each Machine in the list.
         // Assumed one Machine has same PE rating.
+        this.peSize = resource_.getMachineList().get(0).getNumPE();
+        
         MachineList list = super.resource_.getMachineList();
         int size = list.size();
         machineRating_ = new int[size];
@@ -124,11 +126,10 @@ class CenapadAllocPolicy extends AllocPolicy {
     public synchronized void gridletSubmit(Gridlet gl, boolean ack) {
         // update the current Gridlets in exec list up to this point in time
         updateGridletProcessing();
-
-
+        if (gl.getNumPE() > this.peSize) return;
         ResGridlet rgl = new ResGridlet(gl);
         boolean success = allocatePEtoGridlet(rgl);
-        
+
         // if no available PE then put the ResGridlet into a Queue list
         if (!success) {
             rgl.setGridletStatus(Gridlet.QUEUED);
@@ -447,12 +448,16 @@ class CenapadAllocPolicy extends AllocPolicy {
         // (First Come First Serve) approach. Then removes the Gridlet from
         // the Queue list
         while (!gridletQueueList_.isEmpty()) {
+            System.out.println(gridletQueueList_.size());
             ResGridlet obj = (ResGridlet) gridletQueueList_.get(0);
 
             // allocate the Gridlet into an empty PE slot and remove it from
             // the queue list
-            if ( allocatePEtoGridlet(obj) );
+            if (allocatePEtoGridlet(obj)) {
                 gridletQueueList_.remove(obj);
+            } else {
+                break;
+            }
         }
     }
 
@@ -543,7 +548,7 @@ class CenapadAllocPolicy extends AllocPolicy {
                 break;
             }
         }
-        
+
         // If a Machine is empty then ignore the rest
         if (myMachine == null) {
             return false;
@@ -551,22 +556,21 @@ class CenapadAllocPolicy extends AllocPolicy {
 
         // gets the list of PEs and find one empty PE
         PEList MyPEList = myMachine.getPEList();
-        for (int i=0; i<rgl.getNumPE(); i++) {
+        for (int i = 0; i < rgl.getNumPE(); i++) {
             int freePE = MyPEList.getFreePEID();
-            
+
             // Register PE and machine to gridlet
             rgl.setMachineAndPEID(myMachine.getMachineID(), freePE);
-            
+
             // Set allocated PE to BUSY status
             super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE);
         }
-        
+
         // change Gridlet status
-        rgl.setGridletStatus(Gridlet.INEXEC);  
- 
+        rgl.setGridletStatus(Gridlet.INEXEC);
+
         // add this Gridlet into execution list
         gridletInExecList_.add(rgl);
-
 
         // Identify Completion Time and Set Interrupt
         int rating = machineRating_[rgl.getMachineID()];
@@ -657,8 +661,9 @@ class CenapadAllocPolicy extends AllocPolicy {
         if (peList == null) {
             super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
         } else {
-            for(int peID : peList) 
+            for (int peID : peList) {
                 resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peID);
+            }
         }
 
         // the order is important! Set the status first then finalize

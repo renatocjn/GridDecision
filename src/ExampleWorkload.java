@@ -43,7 +43,7 @@ public class ExampleWorkload {
 
             //////////////////////////////////////////////////////
             /////// Creating Workload
-            String tracefile = "workload_all.jobs"; // custom trace file format
+            String tracefile = "workload_mini.jobs"; // custom trace file format
             Workload workload
                     = new Workload("Load_0", tracefile, resName, rating);
 
@@ -63,7 +63,7 @@ public class ExampleWorkload {
                 glList.add(gl);
             }
             printGridletList(glList);
-            //workload.printGridletList(true);
+            //workload.printGridletList(false);
         } catch (Exception e) {
             e.printStackTrace();
         }

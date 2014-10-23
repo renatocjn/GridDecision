@@ -99,6 +99,10 @@ class CenapadAllocPolicy extends AllocPolicy {
                 updateGridletProcessing();   // update Gridlets
                 checkGridletCompletion();    // check for finished Gridlets
             }
+//            System.out.print("Machines in use: ");
+//            for (ResGridlet rgl : gridletInExecList_) 
+//                System.out.print(rgl.getMachineID()+" ");
+//            System.out.println();
         }
 
         // CHECK for ANY INTERNAL EVENTS WAITING TO BE PROCESSED
@@ -448,7 +452,6 @@ class CenapadAllocPolicy extends AllocPolicy {
         // (First Come First Serve) approach. Then removes the Gridlet from
         // the Queue list
         while (!gridletQueueList_.isEmpty()) {
-            System.out.println(gridletQueueList_.size());
             ResGridlet obj = (ResGridlet) gridletQueueList_.get(0);
 
             // allocate the Gridlet into an empty PE slot and remove it from

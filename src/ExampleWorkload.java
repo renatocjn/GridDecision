@@ -43,7 +43,8 @@ public class ExampleWorkload {
 
             //////////////////////////////////////////////////////
             /////// Creating Workload
-            String tracefile = "workload_mini.jobs"; // custom trace file format
+            //String tracefile = "workload_mini.jobs"; // custom trace file format
+            String tracefile = args[0]; // custom trace file format
             Workload workload
                     = new Workload("Load_0", tracefile, resName, rating);
 
@@ -77,20 +78,20 @@ public class ExampleWorkload {
         //System.out.println();
         //System.out.println("========== OUTPUT ==========");
         System.out.println("Gridlet ID" + div + "SubmissionTime" + div
-                + "QueueTime" + div + "RunTime");
+                + "QueueTime" + div + "RunTime"+div+"State");
 
         for (int i = 0; i < size; i++) {
             gridlet = (Gridlet) list.get(i);
             System.out.print(gridlet.getGridletID());
             System.out.print(div + gridlet.getSubmissionTime());
             
-            double queueTime = gridlet.getExecStartTime() - 
-                    gridlet.getSubmissionTime();
+            double queueTime = gridlet.getWaitingTime();
             System.out.print(div + queueTime);
             
-            double runTime = gridlet.getFinishTime() - 
-                    gridlet.getExecStartTime();
-            System.out.println(div + runTime);
+            double runTime = gridlet.getWallClockTime();
+            System.out.print(div + runTime);
+            
+            System.out.println(div + gridlet.getGridletStatusString());
         }
     }
 

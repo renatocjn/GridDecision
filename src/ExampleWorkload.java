@@ -78,7 +78,7 @@ public class ExampleWorkload {
         //System.out.println();
         //System.out.println("========== OUTPUT ==========");
         System.out.println("Gridlet ID" + div + "SubmissionTime" + div
-                + "QueueTime" + div + "RunTime"+div+"State");
+                + "QueueTime" + div + "RunTime"+div+"NumPE");
 
         for (int i = 0; i < size; i++) {
             gridlet = (Gridlet) list.get(i);
@@ -91,7 +91,7 @@ public class ExampleWorkload {
             double runTime = gridlet.getWallClockTime();
             System.out.print(div + runTime);
             
-            System.out.println(div + gridlet.getGridletStatusString());
+            System.out.println(div + gridlet.getNumPE());
         }
     }
 

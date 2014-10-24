@@ -9,6 +9,12 @@ import java.util.Iterator;
 import eduni.simjava.Sim_event;
 import eduni.simjava.Sim_system;
 import gridsim.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * SpaceShared class is an allocation policy for GridResource that behaves
@@ -32,7 +38,9 @@ class CenapadAllocPolicy extends AllocPolicy {
     private ResGridletList gridletPausedList_;    // Pause list
     private double lastUpdateTime_;    // the last time Gridlets updated
     private int[] machineRating_;      // list of machine ratings available
-    private int peSize;
+    private int maxPeSize;
+    private int pePerMachine;
+    private final double minimumSpan = 60*60*24;
     /**
      * Allocates a new SpaceShared object
      *
@@ -74,7 +82,17 @@ class CenapadAllocPolicy extends AllocPolicy {
     public void body() {
         // Gets the PE's rating for each Machine in the list.
         // Assumed one Machine has same PE rating.
-        this.peSize = resource_.getMachineList().get(0).getNumPE();
+        pePerMachine = resource_.getMachineList().get(0).getNumPE();
+        maxPeSize = pePerMachine * resource_.getMachineList().size();
+        
+        File fp = new File("res_trace.csv");
+        PrintStream res_trace = null;
+        try {
+            res_trace = new PrintStream(fp);
+            res_trace.println("timestamp,usedPEs,jobsRunning,JobsInQueue");
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(CenapadAllocPolicy.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
         MachineList list = super.resource_.getMachineList();
         int size = list.size();
@@ -85,6 +103,7 @@ class CenapadAllocPolicy extends AllocPolicy {
 
         // a loop that is looking for internal events only
         Sim_event ev = new Sim_event();
+        double lastPrintedTrace = 0;
         while (Sim_system.running()) {
             super.sim_get_next(ev);
 
@@ -92,6 +111,20 @@ class CenapadAllocPolicy extends AllocPolicy {
             if (ev.get_tag() == GridSimTags.END_OF_SIMULATION
                     || super.isEndSimulation()) {
                 break;
+            }
+            
+            //Print status to trace file
+            double span = GridSim.clock() - lastPrintedTrace;
+            if (span > minimumSpan) {
+                int usedPE = 0;
+                for (Machine m : resource_.getMachineList()) {
+                    usedPE += m.getNumBusyPE();
+                }
+                res_trace.print(GridSim.clock()+",");
+                res_trace.print(usedPE+",");
+                res_trace.print(gridletInExecList_.size()+",");
+                res_trace.println(gridletQueueList_.size());
+                lastPrintedTrace = GridSim.clock();
             }
 
             // Internal Event if the event source is this entity
@@ -130,7 +163,7 @@ class CenapadAllocPolicy extends AllocPolicy {
     public synchronized void gridletSubmit(Gridlet gl, boolean ack) {
         // update the current Gridlets in exec list up to this point in time
         updateGridletProcessing();
-        if (gl.getNumPE() > this.peSize) return;
+        
         ResGridlet rgl = new ResGridlet(gl);
         boolean success = allocatePEtoGridlet(rgl);
 
@@ -160,7 +193,7 @@ class CenapadAllocPolicy extends AllocPolicy {
      * @post $none
      */
     public synchronized int gridletStatus(int gridletId, int userId) {
-        ResGridlet rgl = null;
+        ResGridlet rgl;
 
         // Find in EXEC List first
         int found = gridletInExecList_.indexOf(gridletId, userId);
@@ -503,9 +536,13 @@ class CenapadAllocPolicy extends AllocPolicy {
         Iterator iter = gridletInExecList_.iterator();
         while (iter.hasNext()) {
             obj = (ResGridlet) iter.next();
-
+            
             // Updates the Gridlet length that is currently being executed
-            load = getMIShare(timeSpan, obj.getMachineID());
+            if (obj.getListMachineID() == null) {
+                load = getMIShare(timeSpan, obj.getMachineID());
+            } else {
+                load = getMIShare(timeSpan, obj.getListMachineID()[0]);
+            }
             obj.updateGridletFinishedSoFar(load);
         }
     }
@@ -527,7 +564,7 @@ class CenapadAllocPolicy extends AllocPolicy {
 
         // each Machine might have different PE Rating compare to another
         // so much look at which Machine this PE belongs to
-        double totalMI = machineRating_[machineId] * timeSpan * (1 - localLoad);
+        double totalMI = 100.0 * timeSpan * (1 - localLoad);
         return totalMI;
     }
 
@@ -543,32 +580,36 @@ class CenapadAllocPolicy extends AllocPolicy {
      */
     private boolean allocatePEtoGridlet(ResGridlet rgl) {
         // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
-        Machine myMachine = null;
-
+        if (rgl.getNumPE() > maxPeSize) 
+            return false;
+        
+        int requiredMachines = (int) Math.ceil(rgl.getNumPE()/pePerMachine);
+        ArrayList<Machine> machines = new ArrayList<Machine>();
         for (Machine m : resource_.getMachineList()) {
-            if (m.getNumBusyPE() == 0 && m.getNumPE() >= rgl.getNumPE()) {
-                myMachine = m;
-                break;
+            if (m.getNumBusyPE() == 0) {
+                machines.add(m);
             }
         }
-
+        
         // If a Machine is empty then ignore the rest
-        if (myMachine == null) {
+        if (machines.size() < requiredMachines) {
             return false;
         }
 
-        // gets the list of PEs and find one empty PE
-        PEList MyPEList = myMachine.getPEList();
-        for (int i = 0; i < rgl.getNumPE(); i++) {
-            int freePE = MyPEList.getFreePEID();
+        int allocatedPEs = 0;
+        for (Machine m : machines) {
+            for (PE freePE : m.getPEList()) {
+                // Register PE and machine to gridlet
+                rgl.setMachineAndPEID(m.getMachineID(), freePE.getID());
 
-            // Register PE and machine to gridlet
-            rgl.setMachineAndPEID(myMachine.getMachineID(), freePE);
-
-            // Set allocated PE to BUSY status
-            super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE);
+                // Set allocated PE to BUSY status
+                super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE.getID());
+                
+                allocatedPEs++;
+                if (allocatedPEs == rgl.getNumPE()) break;
+            }
+            if (allocatedPEs == rgl.getNumPE()) break;
         }
-
         // change Gridlet status
         rgl.setGridletStatus(Gridlet.INEXEC);
 
@@ -660,13 +701,15 @@ class CenapadAllocPolicy extends AllocPolicy {
      */
     private void gridletFinish(ResGridlet rgl, int status) {
         // Set PE on which Gridlet finished to FREE
-        int[] peList = rgl.getListPEID();
-        if (peList == null) {
-            super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
-        } else {
-            for (int peID : peList) {
-                resource_.setStatusPE(PE.FREE, rgl.getMachineID(), peID);
+        
+        if (rgl.getNumPE() > 1) {
+            for (int m : rgl.getListMachineID()) {
+                for (int pe : rgl.getListPEID()) {
+                    resource_.setStatusPE(PE.FREE, m, pe);
+                }
             }
+        } else {
+            super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
         }
 
         // the order is important! Set the status first then finalize

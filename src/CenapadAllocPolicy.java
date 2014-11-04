@@ -13,6 +13,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,14 +35,21 @@ import java.util.logging.Logger;
  */
 class CenapadAllocPolicy extends AllocPolicy {
 
-    private ResGridletList gridletQueueList_;     // Queue list
+    private ResGridletList gridletLongQueueList_;     // Queue list
+    private ResGridletList gridletMediumQueueList_;     // Queue list
     private ResGridletList gridletInExecList_;    // Execution list
     private ResGridletList gridletPausedList_;    // Pause list
     private double lastUpdateTime_;    // the last time Gridlets updated
     private int[] machineRating_;      // list of machine ratings available
     private int maxPeSize;
     private int pePerMachine;
-    private final double minimumSpan = 60*60*24;
+    private final double minimumSpan = 60 * 60 * 24;
+    private double lastPrintedTrace = 0;
+    private PrintStream res_trace = null;
+    private final int PartitionMedium = 0;
+    private final int PartitionLong = 1;
+    private Set<Integer> mediumPartitionIds;
+    
     /**
      * Allocates a new SpaceShared object
      *
@@ -68,9 +77,19 @@ class CenapadAllocPolicy extends AllocPolicy {
         // initialises local data structure
         this.gridletInExecList_ = new ResGridletList();
         this.gridletPausedList_ = new ResGridletList();
-        this.gridletQueueList_ = new ResGridletList();
+        this.gridletLongQueueList_ = new ResGridletList();
+        this.gridletMediumQueueList_ = new ResGridletList();
+        this.mediumPartitionIds = new HashSet<Integer>();
         this.lastUpdateTime_ = 0.0;
         this.machineRating_ = null;
+         
+        File fp = new File("res_trace.csv");
+        try {
+            res_trace = new PrintStream(fp);
+            res_trace.println("timestamp,usedPEs,jobsRunning,JobsInQueue");
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(CenapadAllocPolicy.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -84,16 +103,7 @@ class CenapadAllocPolicy extends AllocPolicy {
         // Assumed one Machine has same PE rating.
         pePerMachine = resource_.getMachineList().get(0).getNumPE();
         maxPeSize = pePerMachine * resource_.getMachineList().size();
-        
-        File fp = new File("res_trace.csv");
-        PrintStream res_trace = null;
-        try {
-            res_trace = new PrintStream(fp);
-            res_trace.println("timestamp,usedPEs,jobsRunning,JobsInQueue");
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(CenapadAllocPolicy.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        
+
         MachineList list = super.resource_.getMachineList();
         int size = list.size();
         machineRating_ = new int[size];
@@ -101,6 +111,14 @@ class CenapadAllocPolicy extends AllocPolicy {
             machineRating_[i] = super.resource_.getMIPSRatingOfOnePE(i, 0);
         }
 
+        int medium_size = 38;
+        for (Machine m : resource_.getMachineList()) {
+            if (mediumPartitionIds.size() >= medium_size) {
+                break;
+            }
+            mediumPartitionIds.add(m.getMachineID());
+        }
+        
         // a loop that is looking for internal events only
         Sim_event ev = new Sim_event();
         double lastPrintedTrace = 0;
@@ -111,20 +129,6 @@ class CenapadAllocPolicy extends AllocPolicy {
             if (ev.get_tag() == GridSimTags.END_OF_SIMULATION
                     || super.isEndSimulation()) {
                 break;
-            }
-            
-            //Print status to trace file
-            double span = GridSim.clock() - lastPrintedTrace;
-            if (span > minimumSpan) {
-                int usedPE = 0;
-                for (Machine m : resource_.getMachineList()) {
-                    usedPE += m.getNumBusyPE();
-                }
-                res_trace.print(GridSim.clock()+",");
-                res_trace.print(usedPE+",");
-                res_trace.print(gridletInExecList_.size()+",");
-                res_trace.println(gridletQueueList_.size());
-                lastPrintedTrace = GridSim.clock();
             }
 
             // Internal Event if the event source is this entity
@@ -147,6 +151,8 @@ class CenapadAllocPolicy extends AllocPolicy {
             System.out.println(super.resName_
                     + ".SpaceShared.body(): ignore internal events");
         }
+        
+        res_trace.close();
     }
 
     /**
@@ -165,12 +171,15 @@ class CenapadAllocPolicy extends AllocPolicy {
         updateGridletProcessing();
         
         ResGridlet rgl = new ResGridlet(gl);
-        boolean success = allocatePEtoGridlet(rgl);
-
+        int partition = gl.getClassType();
+        boolean success = allocatePEtoGridlet(rgl, partition);
         // if no available PE then put the ResGridlet into a Queue list
         if (!success) {
             rgl.setGridletStatus(Gridlet.QUEUED);
-            gridletQueueList_.add(rgl);
+            if (partition == PartitionMedium)
+                gridletMediumQueueList_.add(rgl);
+            else
+                gridletLongQueueList_.add(rgl);
         }
 
         // sends back an ack if required
@@ -212,12 +221,12 @@ class CenapadAllocPolicy extends AllocPolicy {
         }
 
         // Find in Queue List
-        found = gridletQueueList_.indexOf(gridletId, userId);
-        if (found >= 0) {
-            // Get the Gridlet from the execution list
-            rgl = (ResGridlet) gridletQueueList_.get(found);
-            return rgl.getGridletStatus();
-        }
+        //found = gridletQueueList_.indexOf(gridletId, userId);
+//        if (found >= 0) {
+//            // Get the Gridlet from the execution list
+//            rgl = (ResGridlet) gridletQueueList_.get(found);
+//            return rgl.getGridletStatus();
+//        }
 
         // if not found in all 3 lists then no found
         return -1;
@@ -326,29 +335,29 @@ class CenapadAllocPolicy extends AllocPolicy {
                 allocateQueueGridlet();
             }
         } else {      // Find in QUEUE list
-            found = gridletQueueList_.indexOf(gridletId, userId);
+            //found = gridletQueueList_.indexOf(gridletId, userId);
         }
 
         // if found in the Queue List
-        if (status == false && found >= 0) {
-            status = true;
-
-            // removes the Gridlet from the Queue list
-            ResGridlet rgl = (ResGridlet) gridletQueueList_.remove(found);
-            rgl.setGridletStatus(Gridlet.PAUSED);   // change the status
-            gridletPausedList_.add(rgl);            // add into the paused list
-        } // if not found anywhere in both exec and paused lists
-        else if (found == -1) {
-            System.out.println(super.resName_
-                    + ".SpaceShared.gridletPause(): Error - cannot "
-                    + "find Gridlet #" + gridletId + " for User #" + userId);
-        }
-
-        // sends back an ack if required
-        if (ack) {
-            super.sendAck(GridSimTags.GRIDLET_PAUSE_ACK, status,
-                    gridletId, userId);
-        }
+//        if (status == false && found >= 0) {
+//            status = true;
+//
+//            // removes the Gridlet from the Queue list
+//            ResGridlet rgl = (ResGridlet) gridletQueueList_.remove(found);
+//            rgl.setGridletStatus(Gridlet.PAUSED);   // change the status
+//            gridletPausedList_.add(rgl);            // add into the paused list
+//        } // if not found anywhere in both exec and paused lists
+//        else if (found == -1) {
+//            System.out.println(super.resName_
+//                    + ".SpaceShared.gridletPause(): Error - cannot "
+//                    + "find Gridlet #" + gridletId + " for User #" + userId);
+//        }
+//
+//        // sends back an ack if required
+//        if (ack) {
+//            super.sendAck(GridSimTags.GRIDLET_PAUSE_ACK, status,
+//                    gridletId, userId);
+//        }
     }
 
     /**
@@ -447,13 +456,13 @@ class CenapadAllocPolicy extends AllocPolicy {
             // if there is an available PE slot, then allocate immediately
             boolean success = false;
             if (gridletInExecList_.size() < super.totalPE_) {
-                success = allocatePEtoGridlet(rgl);
+                //success = allocatePEtoGridlet(rgl);
             }
 
             // otherwise put into Queue list
             if (!success) {
                 rgl.setGridletStatus(Gridlet.QUEUED);
-                gridletQueueList_.add(rgl);
+                //gridletQueueList_.add(rgl);
             }
 
             System.out.println(super.resName_ + "TimeShared.gridletResume():"
@@ -484,17 +493,23 @@ class CenapadAllocPolicy extends AllocPolicy {
         // PE to the first Gridlet in the list since it follows FCFS
         // (First Come First Serve) approach. Then removes the Gridlet from
         // the Queue list
-        while (!gridletQueueList_.isEmpty()) {
-            ResGridlet obj = (ResGridlet) gridletQueueList_.get(0);
-
-            // allocate the Gridlet into an empty PE slot and remove it from
-            // the queue list
-            if (allocatePEtoGridlet(obj)) {
-                gridletQueueList_.remove(obj);
-            } else {
-                break;
+        boolean allocatedFromQueue;
+        ResGridlet obj;
+        do {
+            allocatedFromQueue = false;
+            if (!gridletLongQueueList_.isEmpty()) {
+                obj = (ResGridlet) gridletLongQueueList_.get(0);
+                if (allocatePEtoGridlet(obj, PartitionLong))
+                    allocatedFromQueue = true;
             }
-        }
+            
+            if (!gridletMediumQueueList_.isEmpty()) {
+                obj = (ResGridlet) gridletMediumQueueList_.get(0);
+                if (allocatePEtoGridlet(obj, PartitionMedium))
+                    allocatedFromQueue = true;
+            }
+            
+        } while (allocatedFromQueue);
     }
 
     /**
@@ -536,14 +551,22 @@ class CenapadAllocPolicy extends AllocPolicy {
         Iterator iter = gridletInExecList_.iterator();
         while (iter.hasNext()) {
             obj = (ResGridlet) iter.next();
-            
+
             // Updates the Gridlet length that is currently being executed
-            if (obj.getListMachineID() == null) {
-                load = getMIShare(timeSpan, obj.getMachineID());
-            } else {
-                load = getMIShare(timeSpan, obj.getListMachineID()[0]);
-            }
+            
+            load = getMIShare(timeSpan);
             obj.updateGridletFinishedSoFar(load);
+        }
+        
+        //Print status to trace file
+        double span = time - lastPrintedTrace;
+        if (span > minimumSpan) {
+            res_trace.print(time + ",");
+            res_trace.print(resource_.getNumBusyPE() + ",");
+            res_trace.print(gridletInExecList_.size() + ",");
+            res_trace.print(gridletMediumQueueList_.size());
+            res_trace.println(gridletLongQueueList_.size());
+            lastPrintedTrace = time;
         }
     }
 
@@ -558,12 +581,14 @@ class CenapadAllocPolicy extends AllocPolicy {
      * @pre machineId > 0
      * @post $result >= 0.0
      */
-    private double getMIShare(double timeSpan, int machineId) {
+    private double getMIShare(double timeSpan) {
         // 1 - localLoad_ = available MI share percentage
         double localLoad = super.resCalendar_.getCurrentLoad();
 
         // each Machine might have different PE Rating compare to another
         // so much look at which Machine this PE belongs to
+        
+        // 100.0 is for the MIPs rating for the PEs     ~RenatoCJN
         double totalMI = 100.0 * timeSpan * (1 - localLoad);
         return totalMI;
     }
@@ -578,20 +603,23 @@ class CenapadAllocPolicy extends AllocPolicy {
      * @pre rgl != null
      * @post $none
      */
-    private boolean allocatePEtoGridlet(ResGridlet rgl) {
-        // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
-        if (rgl.getNumPE() > maxPeSize) 
+    private synchronized boolean allocatePEtoGridlet(ResGridlet rgl, int partition) {
+        // IDENTIFY MACHINE whi ch has a free PE and add this Gridlet to it.
+        if (rgl.getNumPE() > maxPeSize) {
             return false;
-        
-        int requiredMachines = (int) Math.ceil(rgl.getNumPE()/pePerMachine);
+        }
+
+        int requiredMachines = (int) Math.ceil(rgl.getNumPE() / pePerMachine);
         ArrayList<Machine> machines = new ArrayList<Machine>();
         for (Machine m : resource_.getMachineList()) {
-            if (m.getNumBusyPE() == 0) {
+            if (m.getNumBusyPE() == 0 && 
+                    (partition == PartitionLong || 
+                    (partition == PartitionMedium && this.mediumPartitionIds.contains(m.getMachineID())) )
+                    ){
                 machines.add(m);
             }
         }
-        
-        // If a Machine is empty then ignore the rest
+
         if (machines.size() < requiredMachines) {
             return false;
         }
@@ -603,12 +631,17 @@ class CenapadAllocPolicy extends AllocPolicy {
                 rgl.setMachineAndPEID(m.getMachineID(), freePE.getID());
 
                 // Set allocated PE to BUSY status
-                super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE.getID());
-                
+                super.resource_.setStatusPE(PE.BUSY, m.getMachineID(),
+                        freePE.getID());
+
                 allocatedPEs++;
-                if (allocatedPEs == rgl.getNumPE()) break;
+                if (allocatedPEs == rgl.getNumPE()) {
+                    break;
+                }
             }
-            if (allocatedPEs == rgl.getNumPE()) break;
+            if (allocatedPEs == rgl.getNumPE()) {
+                break;
+            }
         }
         // change Gridlet status
         rgl.setGridletStatus(Gridlet.INEXEC);
@@ -623,7 +656,6 @@ class CenapadAllocPolicy extends AllocPolicy {
 
         int roundUpTime = (int) (time + 1);   // rounding up
         rgl.setFinishTime(roundUpTime);
-
         // then send this into itself
         super.sendInternalEvent(roundUpTime);
         return true;
@@ -701,7 +733,7 @@ class CenapadAllocPolicy extends AllocPolicy {
      */
     private void gridletFinish(ResGridlet rgl, int status) {
         // Set PE on which Gridlet finished to FREE
-        
+
         if (rgl.getNumPE() > 1) {
             for (int m : rgl.getListMachineID()) {
                 for (int pe : rgl.getListPEID()) {
@@ -760,21 +792,21 @@ class CenapadAllocPolicy extends AllocPolicy {
         }
 
         // Find in QUEUE list
-        found = gridletQueueList_.indexOf(gridletId, userId);
-        if (found >= 0) {
-            rgl = (ResGridlet) gridletQueueList_.remove(found);
-            rgl.setGridletStatus(Gridlet.CANCELED);
-        } // if not, then find in the Paused list
-        else {
-            found = gridletPausedList_.indexOf(gridletId, userId);
-
-            // if found in Paused list
-            if (found >= 0) {
-                rgl = (ResGridlet) gridletPausedList_.remove(found);
-                rgl.setGridletStatus(Gridlet.CANCELED);
-            }
-
-        }
+//        found = gridletQueueList_.indexOf(gridletId, userId);
+//        if (found >= 0) {
+//            rgl = (ResGridlet) gridletQueueList_.remove(found);
+//            rgl.setGridletStatus(Gridlet.CANCELED);
+//        } // if not, then find in the Paused list
+//        else {
+//            found = gridletPausedList_.indexOf(gridletId, userId);
+//
+//            // if found in Paused list
+//            if (found >= 0) {
+//                rgl = (ResGridlet) gridletPausedList_.remove(found);
+//                rgl.setGridletStatus(Gridlet.CANCELED);
+//            }
+//
+//        }
         return rgl;
     }
 }

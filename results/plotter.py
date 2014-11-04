@@ -25,20 +25,26 @@ time_ticks_str = [ num2date(t).strftime("%d/%m/%Y") for t in time_ticks ]
 wait_ticks = linspace(waitTime.min(), waitTime.max(), 10)
 wait_ticks_str = [ timedelta(seconds=t) for t in wait_ticks ]
 
-subplot(221)
-xticks(time_ticks, time_ticks_str, rotation=20)
+subplot(311)
+xticks(time_ticks, time_ticks_str)
 yticks(wait_ticks, wait_ticks_str)
 title("Wait Time Evolution")
+xlabel("Timeline")
+ylabel("Time Waiting")
 plot_date(timeline, waitTime, fmt='-')
 
-subplot(223)
-xticks(time_ticks, time_ticks_str, rotation=20)
-title("Histogram of Submission")
+subplot(312)
+xticks(time_ticks, time_ticks_str)
+title("Histogram of amount of Submission")
+xlabel("Timeline")
+ylabel("Amount of Submissions")
 hist(timeline)
 
-subplot(224)
-xticks(wait_ticks, wait_ticks_str, rotation=20)
-title("Histogram of Wait time")
+subplot(313)
+xticks(wait_ticks, wait_ticks_str, rotation=15)
+title("Histogram of Wait time of submissions")
+xlabel("Time waited")
+ylabel("Amount of Submissions")
 hist(waitTime)
 
 

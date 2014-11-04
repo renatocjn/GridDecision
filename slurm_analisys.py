@@ -4,12 +4,13 @@ from time import mktime, strptime
 from numpy import array, sqrt, ceil, floor
 from datetime import timedelta
 """
-	assuming output from: sacct -a -P -sCD -S <start_time> --format JobID,JobName,User,NCPUS,Submit,Start,End
+	assuming output from: sacct -a -P -sCD -S <start_time> --format JobID,JobName,Partition,User,NCPUS,Submit,Start,End
 """
  
 timeParser = lambda timestr: mktime(strptime(timestr.strip(), "%Y-%m-%dT%H:%M:%S"))
 
 def parseJobs(filepath, user=None, jobName=None):
+	_1min = 360 #seconds
 	finput = open(filepath)
 	finput.next() #skip header line
 	jobs = list()
@@ -22,11 +23,14 @@ def parseJobs(filepath, user=None, jobName=None):
 		job = dict()
 		job['jobid'] = line[0]
 		job['jobname'] = line[1]
-		job['user'] = line[2]
-		job['ncpus'] = int(line[3])
-		job['submitTime'] = timeParser(line[4])
-		job['queueTime'] = timeParser(line[5]) - timeParser(line[4])
-		job['runTime'] = timeParser(line[6]) - timeParser(line[5])
+		job['partition'] = line[2]
+		job['user'] = line[3]
+		job['ncpus'] = int(line[4])
+		job['submitTime'] = timeParser(line[5])
+		job['queueTime'] = timeParser(line[6]) - timeParser(line[5])
+		job['runTime'] = timeParser(line[7]) - timeParser(line[6])
+		
+		if job['runTime'] < _1min or not job['jobid'].isdigit(): continue
 		jobs.append(job)
 	finput.close()
 	return jobs
@@ -82,7 +86,19 @@ def applyStatistics(groupedJobs):
 			
 	return statistics
 
-'''
+'''	
+jobs = parseJobs('test_jobs.txt')
+fp = open('real_original_all.csv', 'w')
+fp.write('Gridlet ID,SubmissionTime,QueueTime,RunTime,State\n')
+for job in jobs:
+	fp.write('%s,'%job['jobid'])
+	fp.write('%s,'%job['submitTime'])
+	fp.write('%s,'%job['queueTime'])
+	fp.write('%s,'%job['runTime'])
+	fp.write('Success\n')
+fp.close()
+
+### print jobs on screen
 jobs = jobsByCpuUsage('all_year_jobs.txt')
 #jobs = jobsByUser('all_year_jobs.txt')
 
@@ -102,11 +118,14 @@ sizes = array(sizes)
 print sizes
 print
 
+
+jobs = jobsByJobName('all_year_jobs.txt')
 jobs_info = applyStatistics(jobs)
 for jobname, stats in jobs_info.viewitems():
+	if stats['njobs'] < 10: continue
 	print jobname
 	print "\tnjobs", stats['njobs']
-	print "\tjobnames", len(list({ job['jobname'] for job in jobs[jobname] }))
+	print "\tUsers", list({ job['user'] for job in jobs[jobname] })
 	for t in ['queueTime', 'runTime']:
 		print '\tprinting', t
 		print "\t\tmin  ", timedelta(seconds=stats[t]['min'])
@@ -117,7 +136,8 @@ for jobname, stats in jobs_info.viewitems():
 		ci = stats[t]['ci']
 		print "\t\trange", timedelta(seconds=(m - ci)), '~', timedelta(seconds=(m + ci))
 	print
-'''
+
+### write to file by jobs cpu usage
 Jobs = jobsByCpuUsage('all_year_jobs.txt')
 i = 1
 output = open("workload_singlecore.jobs","w")
@@ -131,20 +151,11 @@ for job in Jobs['multicore']:
 	output.write( "%i\t%i\t%i\t%i\n" % (i, job['submitTime'], job['runTime'], job['ncpus'] ) )
 	i+=1
 output.close()
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+'''
+i = 1 
+Jobs = parseJobs('test_jobs_aug.txt')
+output = open("workload_test_aug.jobs","w")
+for job in Jobs:
+	output.write( "%i\t%i\t%i\t%i\t%s\n" % (i, job['submitTime'], job['runTime'], job['ncpus'], job['partition'] ) )
+	i+=1
+output.close()	

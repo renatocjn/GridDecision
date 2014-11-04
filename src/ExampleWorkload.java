@@ -20,7 +20,7 @@ public class ExampleWorkload {
 
     public static void main(String[] args) {
         try {
-            // number of grid user entities + any Workload entities.
+            // number of grid user entities + any MyWorkload entities.
             int num_user = 1;
             Calendar calendar = Calendar.getInstance();
             boolean trace_flag = true;     // mean trace GridSim events
@@ -33,7 +33,7 @@ public class ExampleWorkload {
             /////// Creating resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
-            int totalMachine = 48;   // total number of Machines
+            int totalMachine = 1;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
@@ -42,15 +42,15 @@ public class ExampleWorkload {
             createGridResource(resName, rating, totalMachine, totalPE, allocPolicy);
 
             //////////////////////////////////////////////////////
-            /////// Creating Workload
+            /////// Creating MyWorkload
             //String tracefile = "workload_mini.jobs"; // custom trace file format
             String tracefile = args[0]; // custom trace file format
-            Workload workload
-                    = new Workload("Load_0", tracefile, resName, rating);
+            MyWorkload workload
+                    = new MyWorkload("Load_0", tracefile, resName, rating);
 
-            // tells the Workload entity what to look for.
+            // tells the MyWorkload entity what to look for.
             // parameters: maxField, jobNum, submitTime, runTime, numPE
-            workload.setField(4, 1, 2, 3, 4);
+            workload.setField(5, 1, 2, 3, 4, 5);
             workload.setComment("#");     // set "#" as a comment
 
             //////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ public class ExampleWorkload {
             System.out.println(div + gridlet.getNumPE());
         }
     }
-
+    
     /**
      * Creates one Grid resource. A Grid resource contains one or more Machines.
      * Similarly, a Machine contains one or more PEs (Processing Elements or

@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
 from time import mktime, strptime
-from numpy import array, sqrt, ceil, floor
+from numpy import array, sqrt, ceil, floor, arange, zeros, argsort,mean
 from datetime import timedelta
+from matplotlib.pyplot import *
+from csv import reader
 """
 	assuming output from: sacct -a -P -sCD -S <start_time> --format JobID,JobName,Partition,User,NCPUS,Submit,Start,End
 """
@@ -19,7 +21,7 @@ def parseJobs(filepath, user=None, jobName=None):
 		if (jobName and line[1] != jobName) or \
 		      (user and line[2] != user):
 			continue
-	
+
 		job = dict()
 		job['jobid'] = line[0]
 		job['jobname'] = line[1]
@@ -53,12 +55,12 @@ jobsByJobName = lambda filepath, user=None, jobname=None: jobsBy('jobname', file
 
 def jobsByCpuUsage(filepath, user=None, jobname=None):
 	jobs = parseJobs(filepath, user, jobname)
-	out = { "singlecore": list(), "multicore": list() }
+	out = { "not_parallel": list(), "parallel": list() }
 	for job in jobs:
-		if job['ncpus'] > 1:
-			out["singlecore"].append(job)
+		if job['ncpus'] <= 12:
+			out["not_parallel"].append(job)
 		else:
-			out["multicore"].append(job)
+			out["parallel"].append(job)
 	del jobs
 	return out
 
@@ -138,24 +140,134 @@ for jobname, stats in jobs_info.viewitems():
 	print
 
 ### write to file by jobs cpu usage
-Jobs = jobsByCpuUsage('all_year_jobs.txt')
+Jobs = jobsByCpuUsage('test_jobs_all.txt')
 i = 1
-output = open("workload_singlecore.jobs","w")
-for job in Jobs['singlecore']:
-	output.write( "%i\t%i\t%i\t%i\n" % (i, job['submitTime'], job['runTime'], job['ncpus'] ) )
+output = open("workload_not_parallel12.jobs","w")
+for job in Jobs['not_parallel']:
+	output.write( "%i\t%i\t%i\t%i\t%s\n" % (i, job['submitTime'], job['runTime'], job['ncpus'], job['partition'] ) )
 	i+=1
 output.close()
 
-output = open("workload_multicore.jobs","w")
-for job in Jobs['multicore']:
-	output.write( "%i\t%i\t%i\t%i\n" % (i, job['submitTime'], job['runTime'], job['ncpus'] ) )
+output = open("workload_parallel12.jobs","w")
+for job in Jobs['parallel']:
+	output.write( "%i\t%i\t%i\t%i\t%s\n" % (i, job['submitTime'], job['runTime'], job['ncpus'], job['partition'] ) )
 	i+=1
 output.close()
 '''
 i = 1 
-Jobs = parseJobs('test_jobs_aug.txt')
-output = open("workload_test_aug.jobs","w")
+Jobs = parseJobs('test_jobs_all.txt')
+output = open("workload_reduced_all.jobs","w")
 for job in Jobs:
 	output.write( "%i\t%i\t%i\t%i\t%s\n" % (i, job['submitTime'], job['runTime'], job['ncpus'], job['partition'] ) )
 	i+=1
-output.close()	
+output.close()
+'''
+
+Jobs = parseJobs('test_jobs_all.txt')
+#Jobs = jobsByCpuUsage('test_jobs_all.txt')['parallel']
+#Jobs = jobsByCpuUsage('test_jobs_all.txt')['not_parallel']
+counters = dict()
+for j in Jobs:
+	nmachines = np.ceil(float(j['ncpus'])/12.0)
+	if nmachines not in counters:
+		counters[nmachines] = 0
+	counters[nmachines] += 1
+y = array(counters.keys())
+x = array(counters.values())
+idx = y.argsort()
+x, y = x[idx], y[idx]
+title('All jobs between 04/2014 to 10/2014')
+xlabel('Numero de jobs (escala logaritmica)')
+yticks(range(13))
+ylabel('Numero de maquinas requisitadas')
+xscale('symlog')
+#hist(cpuCounts, bins=5)
+
+plot(x, y, 'o--', label='Valores reais', linewidth=1.5)
+
+for i,j in counters.viewitems():
+	annotate("(%d, %d)"%(j,i), xy=(j,i))
+
+grid(True)
+legend()
+show()
+
+Jobs = parseJobs('test_jobs_all.txt')
+vals = [ j['ncpus'] for j in Jobs ]
+#_, bins, _ = hist(vals, log=True, label='Todos os jobs')
+
+Jobs = jobsByCpuUsage('test_jobs_all.txt')['parallel']
+vals = [ j['ncpus'] for j in Jobs ]
+hist(vals, log=True, alpha=0.5, label='Jobs paralelos')
+
+Jobs = jobsByCpuUsage('test_jobs_all.txt')['not_parallel']
+vals = [ j['ncpus'] for j in Jobs ]
+#hist(vals, log=True, alpha=0.5, label='Jobs nao paralelos')
+
+ylabel('Numero de Jobs')
+xlabel('Numero de CPUs requisitadas')
+legend()
+show()
+
+Jobs = parseJobs('test_jobs_all.txt')
+vals = [ j['queueTime'] for j in Jobs ]
+y1, x, _ = hist(vals, bins=20, label="Resultados dos traces")
+#plot(x, y)
+
+fp = open('results/real_original_all.csv', 'r')
+fp.next() #skip line with headers
+
+input_gridlets = reader(fp)
+waitTime = list()
+for gridlet in input_gridlets:
+	metric = float(gridlet[2]) #time waiting in queue
+	waitTime.append(metric) 
+y2, _, _ = hist(waitTime, bins=x, label="Simulado completamente")
+
+fp = open('results/reduced_parallel12.csv', 'r')
+fp.next() #skip line with headers
+
+input_gridlets = reader(fp)
+waitTime = list()
+for gridlet in input_gridlets:
+	metric = float(gridlet[2]) #time waiting in queue
+	waitTime.append(metric) 
+y3, _, _ = hist(waitTime, bins=x, label="Simulacao paralela apenas")
+
+#yscale('log')
+#legend()
+#show()
+for i, j, k, l in zip(x, y1, y2, y3):
+	print i, '/', timedelta(seconds=i), '/', j, '/', k, '/', l
+
+fp = open('results/reduced_parallel12.csv')
+fp.next() #skip line with headers
+
+from csv import reader
+
+input_gridlets = reader(fp)
+timeline, waitTime = list(), list()
+for gridlet in input_gridlets:
+	timeline.append(float(gridlet[1])) #submission time
+	
+	metric = float(gridlet[2]) #time waiting in queue
+	waitTime.append(metric)
+
+hist(waitTime, bins=x, label='Parallel Workload Only')
+
+xlabel('Tempo esperado')
+ylabel('Quantidade de jobs (escala logaritmica)')
+xticks(x[::5], [ timedelta(seconds=i) for i in x[::5] ], rotation=10)
+yticks([], [])
+
+title('All jobs between 04/2014 to 10/2014')
+grid(True)
+legend()
+show()
+
+'''
+
+
+
+
+

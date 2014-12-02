@@ -33,7 +33,7 @@ public class ExampleWorkload {
             /////// Creating resources
             int rating = 100;       // rating of each PE in MIPS
             int totalPE = 12;        // total number of PEs for each Machine
-            int totalMachine = 1;   // total number of Machines
+            int totalMachine = 48;   // total number of Machines
             int i = 0;
 
             String resName = "Res_0";
@@ -78,7 +78,7 @@ public class ExampleWorkload {
         //System.out.println();
         //System.out.println("========== OUTPUT ==========");
         System.out.println("Gridlet ID" + div + "SubmissionTime" + div
-                + "QueueTime" + div + "RunTime"+div+"NumPE");
+                + "QueueTime" + div + "RunTime");
 
         for (int i = 0; i < size; i++) {
             gridlet = (Gridlet) list.get(i);
@@ -89,9 +89,7 @@ public class ExampleWorkload {
             System.out.print(div + queueTime);
             
             double runTime = gridlet.getWallClockTime();
-            System.out.print(div + runTime);
-            
-            System.out.println(div + gridlet.getNumPE());
+            System.out.println(div + runTime);
         }
     }
     

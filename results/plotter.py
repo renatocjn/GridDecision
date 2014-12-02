@@ -28,10 +28,10 @@ wait_ticks_str = [ timedelta(seconds=t) for t in wait_ticks ]
 subplot(311)
 xticks(time_ticks, time_ticks_str)
 yticks(wait_ticks, wait_ticks_str)
-title("Wait Time Evolution")
+title("Wait Time")
 xlabel("Timeline")
 ylabel("Time Waiting")
-plot_date(timeline, waitTime, fmt='-')
+plot_date(timeline, waitTime, fmt='o')
 
 subplot(312)
 xticks(time_ticks, time_ticks_str)

@@ -574,6 +574,11 @@ class CenapadAllocPolicy extends AllocPolicy {
             load = getMIShare(timeSpan);
             obj.updateGridletFinishedSoFar(load);
         }
+        int machineCount = 0;
+        for (Machine m : resource_.getMachineList()) {
+            if (m.getNumBusyPE() > 0)
+                machineCount++;
+        }
 
         //Print status to trace file
         double span = time - lastPrintedTrace;
@@ -582,7 +587,8 @@ class CenapadAllocPolicy extends AllocPolicy {
             res_trace.print(resource_.getNumBusyPE() + ",");
             res_trace.print(gridletInExecList_.size() + ",");
             res_trace.print(gridletMediumQueueList_.size() + ",");
-            res_trace.println(gridletLongQueueList_.size());
+            res_trace.println(gridletLongQueueList_.size() + ",");
+            res_trace.println(machineCount);
             lastPrintedTrace = time;
         }
     }
